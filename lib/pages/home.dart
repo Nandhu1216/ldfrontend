@@ -124,6 +124,7 @@ class _HomePageState extends State<HomePage> {
     final uri = Uri.parse(
       'BACKEND_URL', // Replace with your backend URL
     ); // 🔁 Update your backend URL here
+    print('Uploading to $uri');
     final request = http.MultipartRequest('POST', uri);
 
     request.fields['zone'] = selectedZone!;
