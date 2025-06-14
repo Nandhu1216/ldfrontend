@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
@@ -121,9 +122,8 @@ class _HomePageState extends State<HomePage> {
       return;
     }
 
-    final uri = Uri.parse(
-      'https://ldbackend.onrender.com', // Replace with your backend URL
-    ); // 🔁 Update your backend URL here
+    final uri = Uri.parse(dotenv.env['BACKEND_URL']!);
+
     print('Uploading to $uri');
     final request = http.MultipartRequest('POST', uri);
 
