@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:firebase_auth/firebase_auth.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -18,7 +19,7 @@ class _HomePageState extends State<HomePage> {
   String? selectedSupervisor;
   String? selectedWard;
   DateTime? selectedDate;
-  File? selectedImage;
+  List<File> selectedImages = [];
 
   List<String> zones = [];
   List<String> supervisorsList = [];
@@ -101,21 +102,21 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> pickImage() async {
-    final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
-    if (picked != null) {
+  Future<void> pickImages() async {
+    final pickedImages = await ImagePicker().pickMultiImage();
+    if (pickedImages != null) {
       setState(() {
-        selectedImage = File(picked.path);
+        selectedImages = pickedImages.map((xfile) => File(xfile.path)).toList();
       });
     }
   }
 
-  Future<void> uploadImage() async {
+  Future<void> uploadImages() async {
     if (selectedZone == null ||
         selectedSupervisor == null ||
         selectedWard == null ||
         selectedDate == null ||
-        selectedImage == null) {
+        selectedImages.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please complete all fields')),
       );
@@ -123,41 +124,60 @@ class _HomePageState extends State<HomePage> {
     }
 
     final uri = Uri.parse(dotenv.env['BACKEND_URL']!);
+    final formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate!);
 
-    print('Uploading to $uri');
-    final request = http.MultipartRequest('POST', uri);
+    final uploadTasks = selectedImages.map((image) async {
+      final request = http.MultipartRequest('POST', uri);
+      request.fields['zone'] = selectedZone!;
+      request.fields['supervisor'] = selectedSupervisor!;
+      request.fields['ward'] = selectedWard!;
+      request.fields['date'] = formattedDate;
+      request.files.add(await http.MultipartFile.fromPath('image', image.path));
 
-    request.fields['zone'] = selectedZone!;
-    request.fields['supervisor'] = selectedSupervisor!;
-    request.fields['ward'] = selectedWard!;
-    request.fields['date'] = DateFormat('yyyy-MM-dd').format(selectedDate!);
-    request.files.add(
-      await http.MultipartFile.fromPath('image', selectedImage!.path),
-    );
+      final response = await request.send();
+      return response.statusCode == 200;
+    }).toList();
 
-    final response = await request.send();
+    final results = await Future.wait(uploadTasks);
 
-    if (response.statusCode == 200) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Upload successful')));
+    if (results.every((success) => success)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('All images uploaded successfully')),
+      );
       setState(() {
-        selectedImage = null;
+        selectedImages.clear();
       });
     } else {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Upload failed')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('One or more uploads failed')),
+      );
     }
+  }
+
+  void _logout() async {
+    await FirebaseAuth.instance.signOut();
+    if (!mounted) return;
+    Navigator.pushReplacementNamed(context, '/login');
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Upload Work Image"),
+        title: const Text("Upload Work Images"),
         centerTitle: true,
         backgroundColor: Colors.teal,
+        actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            onSelected: (value) {
+              if (value == 'logout') _logout();
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(value: 'logout', child: Text('Logout')),
+            ],
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -176,8 +196,6 @@ class _HomePageState extends State<HomePage> {
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                   const Divider(height: 30, thickness: 1.5),
-
-                  // Zone Dropdown
                   DropdownButtonFormField<String>(
                     decoration: const InputDecoration(
                       labelText: "Select Zone",
@@ -201,10 +219,7 @@ class _HomePageState extends State<HomePage> {
                       fetchSupervisors(zone!);
                     },
                   ),
-
                   const SizedBox(height: 16),
-
-                  // Supervisor Dropdown
                   DropdownButtonFormField<String>(
                     decoration: const InputDecoration(
                       labelText: "Select Supervisor",
@@ -226,10 +241,7 @@ class _HomePageState extends State<HomePage> {
                       fetchWards(selectedZone!, sup!);
                     },
                   ),
-
                   const SizedBox(height: 16),
-
-                  // Ward Dropdown
                   DropdownButtonFormField<String>(
                     decoration: const InputDecoration(
                       labelText: "Select Ward",
@@ -248,10 +260,7 @@ class _HomePageState extends State<HomePage> {
                       });
                     },
                   ),
-
                   const SizedBox(height: 16),
-
-                  // Date Picker
                   InkWell(
                     onTap: pickDate,
                     child: InputDecorator(
@@ -275,33 +284,40 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 16),
-
-                  // Image Preview
-                  selectedImage != null
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: Image.file(selectedImage!, height: 180),
+                  selectedImages.isNotEmpty
+                      ? SizedBox(
+                          height: 180,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: selectedImages.length,
+                            itemBuilder: (context, index) => Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8.0,
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: Image.file(
+                                  selectedImages[index],
+                                  height: 180,
+                                ),
+                              ),
+                            ),
+                          ),
                         )
-                      : const Text("No image selected"),
-
+                      : const Text("No images selected"),
                   const SizedBox(height: 8),
-
                   ElevatedButton.icon(
-                    onPressed: pickImage,
+                    onPressed: pickImages,
                     icon: const Icon(Icons.image),
-                    label: const Text("Pick Image"),
+                    label: const Text("Pick Images"),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.teal,
                     ),
                   ),
-
                   const SizedBox(height: 30),
-
-                  // Upload Button
                   ElevatedButton.icon(
-                    onPressed: uploadImage,
+                    onPressed: uploadImages,
                     icon: const Icon(Icons.cloud_upload),
                     label: const Text("Upload to Cloudinary"),
                     style: ElevatedButton.styleFrom(
