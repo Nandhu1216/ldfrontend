@@ -123,7 +123,8 @@ class _HomePageState extends State<HomePage> {
       return;
     }
 
-    final uri = Uri.parse(dotenv.env['BACKEND_URL']!);
+    final uri = Uri.parse('https://ldbackend.onrender.com/upload');
+
     final formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate!);
 
     final uploadTasks = selectedImages.map((image) async {
