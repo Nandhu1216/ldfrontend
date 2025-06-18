@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
+import 'login.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -67,26 +68,6 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> fetchCategories() async {
-    try {
-      final doc = await FirebaseFirestore.instance
-          .collection('Categories')
-          .doc('categories')
-          .get();
-
-      if (doc.exists && doc.data() != null) {
-        final List<dynamic> types = doc.data()!['type'];
-        setState(() {
-          categoryList = types.cast<String>().toList();
-        });
-      } else {
-        print("⚠️ 'categories' document not found");
-      }
-    } catch (e) {
-      print("❌ Error loading categories: $e");
-    }
-  }
-
   Future<void> fetchWards(String zone, String supervisorName) async {
     try {
       final docSnapshot = await FirebaseFirestore.instance
@@ -104,6 +85,26 @@ class _HomePageState extends State<HomePage> {
       }
     } catch (e) {
       print("Error loading wards: $e");
+    }
+  }
+
+  Future<void> fetchCategories() async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('Categories')
+          .doc('categories')
+          .get();
+
+      if (doc.exists && doc.data() != null) {
+        final List<dynamic> types = doc.data()!['type'];
+        setState(() {
+          categoryList = types.cast<String>().toList();
+        });
+      } else {
+        print("⚠️ 'categories' document not found");
+      }
+    } catch (e) {
+      print("❌ Error loading categories: $e");
     }
   }
 
@@ -177,8 +178,14 @@ class _HomePageState extends State<HomePage> {
 
   void _logout() async {
     await FirebaseAuth.instance.signOut();
+
     if (!mounted) return;
-    Navigator.pushReplacementNamed(context, '/login');
+
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => const LoginPage()),
+      (route) => false,
+    );
   }
 
   @override
