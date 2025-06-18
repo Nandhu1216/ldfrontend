@@ -18,17 +18,20 @@ class _HomePageState extends State<HomePage> {
   String? selectedZone;
   String? selectedSupervisor;
   String? selectedWard;
+  String? selectedCategory;
   DateTime? selectedDate;
   List<File> selectedImages = [];
 
   List<String> zones = [];
   List<String> supervisorsList = [];
   List<String> wardList = [];
+  List<String> categoryList = [];
 
   @override
   void initState() {
     super.initState();
     fetchZones();
+    fetchCategories();
   }
 
   Future<void> fetchZones() async {
@@ -52,9 +55,7 @@ class _HomePageState extends State<HomePage> {
           .doc(zone)
           .collection('Supervisors')
           .get();
-
       final supervisors = snapshot.docs.map((doc) => doc.id).toList();
-
       setState(() {
         supervisorsList = supervisors;
         selectedSupervisor = null;
@@ -66,6 +67,26 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<void> fetchCategories() async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('Categories')
+          .doc('categories')
+          .get();
+
+      if (doc.exists && doc.data() != null) {
+        final List<dynamic> types = doc.data()!['type'];
+        setState(() {
+          categoryList = types.cast<String>().toList();
+        });
+      } else {
+        print("⚠️ 'categories' document not found");
+      }
+    } catch (e) {
+      print("❌ Error loading categories: $e");
+    }
+  }
+
   Future<void> fetchWards(String zone, String supervisorName) async {
     try {
       final docSnapshot = await FirebaseFirestore.instance
@@ -74,7 +95,6 @@ class _HomePageState extends State<HomePage> {
           .collection('Supervisors')
           .doc(supervisorName)
           .get();
-
       if (docSnapshot.exists) {
         final wards = List<String>.from(docSnapshot['wards']);
         setState(() {
@@ -115,6 +135,7 @@ class _HomePageState extends State<HomePage> {
     if (selectedZone == null ||
         selectedSupervisor == null ||
         selectedWard == null ||
+        selectedCategory == null ||
         selectedDate == null ||
         selectedImages.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -124,7 +145,6 @@ class _HomePageState extends State<HomePage> {
     }
 
     final uri = Uri.parse('https://ldbackend.onrender.com/upload');
-
     final formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate!);
 
     final uploadTasks = selectedImages.map((image) async {
@@ -132,9 +152,9 @@ class _HomePageState extends State<HomePage> {
       request.fields['zone'] = selectedZone!;
       request.fields['supervisor'] = selectedSupervisor!;
       request.fields['ward'] = selectedWard!;
+      request.fields['category'] = selectedCategory!;
       request.fields['date'] = formattedDate;
       request.files.add(await http.MultipartFile.fromPath('image', image.path));
-
       final response = await request.send();
       return response.statusCode == 200;
     }).toList();
@@ -197,6 +217,8 @@ class _HomePageState extends State<HomePage> {
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                   const Divider(height: 30, thickness: 1.5),
+
+                  // Zone Dropdown
                   DropdownButtonFormField<String>(
                     decoration: const InputDecoration(
                       labelText: "Select Zone",
@@ -221,6 +243,8 @@ class _HomePageState extends State<HomePage> {
                     },
                   ),
                   const SizedBox(height: 16),
+
+                  // Supervisor Dropdown
                   DropdownButtonFormField<String>(
                     decoration: const InputDecoration(
                       labelText: "Select Supervisor",
@@ -243,6 +267,8 @@ class _HomePageState extends State<HomePage> {
                     },
                   ),
                   const SizedBox(height: 16),
+
+                  // Ward Dropdown
                   DropdownButtonFormField<String>(
                     decoration: const InputDecoration(
                       labelText: "Select Ward",
@@ -262,6 +288,29 @@ class _HomePageState extends State<HomePage> {
                     },
                   ),
                   const SizedBox(height: 16),
+
+                  // Category Dropdown
+                  DropdownButtonFormField<String>(
+                    decoration: const InputDecoration(
+                      labelText: "Select Category",
+                      border: OutlineInputBorder(),
+                    ),
+                    value: selectedCategory,
+                    items: categoryList
+                        .map(
+                          (cat) =>
+                              DropdownMenuItem(value: cat, child: Text(cat)),
+                        )
+                        .toList(),
+                    onChanged: (cat) {
+                      setState(() {
+                        selectedCategory = cat;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Date Picker
                   InkWell(
                     onTap: pickDate,
                     child: InputDecorator(
@@ -286,6 +335,7 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ),
                   const SizedBox(height: 16),
+
                   selectedImages.isNotEmpty
                       ? SizedBox(
                           height: 180,
@@ -307,6 +357,7 @@ class _HomePageState extends State<HomePage> {
                           ),
                         )
                       : const Text("No images selected"),
+
                   const SizedBox(height: 8),
                   ElevatedButton.icon(
                     onPressed: pickImages,
@@ -316,6 +367,7 @@ class _HomePageState extends State<HomePage> {
                       backgroundColor: Colors.teal,
                     ),
                   ),
+
                   const SizedBox(height: 30),
                   ElevatedButton.icon(
                     onPressed: uploadImages,
