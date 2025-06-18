@@ -164,14 +164,14 @@ class _HomePageState extends State<HomePage> {
 
     if (results.every((success) => success)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('All images uploaded successfully')),
+        const SnackBar(content: Text('uploaded successfully')),
       );
       setState(() {
         selectedImages.clear();
       });
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('One or more uploads failed')),
+        const SnackBar(content: Text('uploads failed')),
       );
     }
   }
