@@ -28,6 +28,8 @@ class _HomePageState extends State<HomePage> {
   List<String> wardList = [];
   List<String> categoryList = [];
 
+  bool _isUploading = false; // ✅ Upload flag
+
   @override
   void initState() {
     super.initState();
@@ -133,6 +135,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> uploadImages() async {
+    if (_isUploading) return;
+
     if (selectedZone == null ||
         selectedSupervisor == null ||
         selectedWard == null ||
@@ -145,34 +149,50 @@ class _HomePageState extends State<HomePage> {
       return;
     }
 
+    setState(() {
+      _isUploading = true;
+    });
+
     final uri = Uri.parse('https://ldbackend.onrender.com/upload');
     final formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate!);
 
-    final uploadTasks = selectedImages.map((image) async {
-      final request = http.MultipartRequest('POST', uri);
-      request.fields['zone'] = selectedZone!;
-      request.fields['supervisor'] = selectedSupervisor!;
-      request.fields['ward'] = selectedWard!;
-      request.fields['category'] = selectedCategory!;
-      request.fields['date'] = formattedDate;
-      request.files.add(await http.MultipartFile.fromPath('image', image.path));
-      final response = await request.send();
-      return response.statusCode == 200;
-    }).toList();
+    try {
+      final uploadTasks = selectedImages.map((image) async {
+        final request = http.MultipartRequest('POST', uri);
+        request.fields['zone'] = selectedZone!;
+        request.fields['supervisor'] = selectedSupervisor!;
+        request.fields['ward'] = selectedWard!;
+        request.fields['category'] = selectedCategory!;
+        request.fields['date'] = formattedDate;
+        request.files.add(
+          await http.MultipartFile.fromPath('image', image.path),
+        );
+        final response = await request.send();
+        return response.statusCode == 200;
+      }).toList();
 
-    final results = await Future.wait(uploadTasks);
+      final results = await Future.wait(uploadTasks);
 
-    if (results.every((success) => success)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('uploaded successfully')),
-      );
+      if (results.every((success) => success)) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Uploaded successfully')));
+        setState(() {
+          selectedImages.clear();
+        });
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Some uploads failed')));
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+    } finally {
       setState(() {
-        selectedImages.clear();
+        _isUploading = false;
       });
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('uploads failed')),
-      );
     }
   }
 
@@ -225,7 +245,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                   const Divider(height: 30, thickness: 1.5),
 
-                  // Zone Dropdown
+                  /// Zone Dropdown
                   DropdownButtonFormField<String>(
                     decoration: const InputDecoration(
                       labelText: "Select Zone",
@@ -251,7 +271,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Supervisor Dropdown
+                  /// Supervisor Dropdown
                   DropdownButtonFormField<String>(
                     decoration: const InputDecoration(
                       labelText: "Select Supervisor",
@@ -275,7 +295,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Ward Dropdown
+                  /// Ward Dropdown
                   DropdownButtonFormField<String>(
                     decoration: const InputDecoration(
                       labelText: "Select Ward",
@@ -296,7 +316,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Category Dropdown
+                  /// Category Dropdown
                   DropdownButtonFormField<String>(
                     decoration: const InputDecoration(
                       labelText: "Select Category",
@@ -317,7 +337,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Date Picker
+                  /// Date Picker
                   InkWell(
                     onTap: pickDate,
                     child: InputDecorator(
@@ -376,10 +396,23 @@ class _HomePageState extends State<HomePage> {
                   ),
 
                   const SizedBox(height: 30),
+
+                  /// ✅ Upload Button
                   ElevatedButton.icon(
-                    onPressed: uploadImages,
-                    icon: const Icon(Icons.cloud_upload),
-                    label: const Text("Upload to Cloudinary"),
+                    onPressed: _isUploading ? null : uploadImages,
+                    icon: _isUploading
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.cloud_upload),
+                    label: Text(
+                      _isUploading ? 'Uploading...' : 'Upload to Cloudinary',
+                    ),
                     style: ElevatedButton.styleFrom(
                       minimumSize: const Size.fromHeight(50),
                       backgroundColor: Colors.teal,
