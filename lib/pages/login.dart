@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'home.dart';
 
 class LoginPage extends StatefulWidget {
@@ -12,34 +11,18 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final TextEditingController _phoneController = TextEditingController();
-  final TextEditingController _otpController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
 
-  String? _verificationId;
-  bool _otpSent = false;
   bool _isLoading = false;
 
-  Future<bool> _isPhoneAllowed(String fullPhoneNumber) async {
-    try {
-      final doc = await FirebaseFirestore.instance
-          .collection('Appusers')
-          .doc('Number')
-          .get();
-
-      final List<dynamic>? numbers = doc.data()?['mobile'];
-      return numbers != null && numbers.contains(fullPhoneNumber);
-    } catch (e) {
-      debugPrint('Error checking phone: $e');
-      return false;
-    }
-  }
-
-  Future<void> _sendOtp() async {
+  Future<void> _login() async {
     final phone = _phoneController.text.trim();
+    final password = _passwordController.text.trim();
 
-    if (phone.isEmpty || phone.length != 10) {
+    if (phone.length != 10 || password.length != 10) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please enter a valid 10-digit phone number'),
+          content: Text('Enter a valid 10-digit phone number and password'),
         ),
       );
       return;
@@ -47,67 +30,23 @@ class _LoginPageState extends State<LoginPage> {
 
     setState(() => _isLoading = true);
 
-    final fullPhone = '+91$phone';
-    final isAllowed = await _isPhoneAllowed(fullPhone);
-
-    if (!isAllowed) {
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('This number is not authorized to login')),
-      );
-      return;
-    }
-
-    await FirebaseAuth.instance.verifyPhoneNumber(
-      phoneNumber: fullPhone,
-      timeout: const Duration(seconds: 60),
-      verificationCompleted: (PhoneAuthCredential credential) async {
-        await FirebaseAuth.instance.signInWithCredential(credential);
-        _navigateToHome();
-      },
-      verificationFailed: (FirebaseAuthException e) {
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Verification failed: ${e.message}')),
-        );
-      },
-      codeSent: (String verificationId, int? resendToken) {
-        setState(() {
-          _otpSent = true;
-          _verificationId = verificationId;
-          _isLoading = false;
-        });
-      },
-      codeAutoRetrievalTimeout: (String verificationId) {
-        _verificationId = verificationId;
-      },
-    );
-  }
-
-  Future<void> _verifyOtp() async {
-    final otp = _otpController.text.trim();
-
-    if (_verificationId == null || otp.length != 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter a valid 6-digit OTP')),
-      );
-      return;
-    }
-
-    setState(() => _isLoading = true);
+    final email = '$phone@org.com';
 
     try {
-      final credential = PhoneAuthProvider.credential(
-        verificationId: _verificationId!,
-        smsCode: otp,
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: email,
+        password: password,
       );
-      await FirebaseAuth.instance.signInWithCredential(credential);
       _navigateToHome();
-    } catch (e) {
+    } on FirebaseAuthException catch (e) {
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid OTP. Please try again.')),
-      );
+      String msg = 'Login failed';
+      if (e.code == 'user-not-found') {
+        msg = 'User not found';
+      } else if (e.code == 'wrong-password') {
+        msg = 'Incorrect password';
+      }
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     }
   }
 
@@ -121,10 +60,7 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Login with OTP'),
-        backgroundColor: Colors.teal,
-      ),
+      appBar: AppBar(title: const Text('Login'), backgroundColor: Colors.teal),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
@@ -135,32 +71,32 @@ class _LoginPageState extends State<LoginPage> {
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,
                 decoration: const InputDecoration(
-                  labelText: 'Phone Number',
-                  prefixText: '+91 ',
+                  labelText: 'User',
+                  hintText: 'Enter 10-digit phone number',
                   border: OutlineInputBorder(),
                 ),
-                enabled: !_otpSent,
               ),
               const SizedBox(height: 20),
-              if (_otpSent)
-                TextField(
-                  controller: _otpController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Enter OTP',
-                    border: OutlineInputBorder(),
-                  ),
+              TextField(
+                controller: _passwordController,
+                keyboardType: TextInputType.number,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'Password',
+                  hintText: 'Enter 10-digit password',
+                  border: OutlineInputBorder(),
                 ),
+              ),
               const SizedBox(height: 20),
               _isLoading
                   ? const CircularProgressIndicator()
                   : ElevatedButton(
-                      onPressed: _otpSent ? _verifyOtp : _sendOtp,
+                      onPressed: _login,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.teal,
                         minimumSize: const Size.fromHeight(50),
                       ),
-                      child: Text(_otpSent ? 'Verify OTP' : 'Send OTP'),
+                      child: const Text('Login'),
                     ),
             ],
           ),
