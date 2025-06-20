@@ -18,16 +18,19 @@ class _LoginPageState extends State<LoginPage> {
   bool _otpSent = false;
   bool _isLoading = false;
 
-  Future<bool> _isPhoneAllowed(String phone) async {
-    final doc = await FirebaseFirestore.instance
-        .collection('Appusers')
-        .doc('Number')
-        .get();
+  Future<bool> _isPhoneAllowed(String fullPhoneNumber) async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('Appusers')
+          .doc('Number')
+          .get();
 
-    if (!doc.exists) return false;
-
-    final List<dynamic> allowed = doc.data()?['mobile'] ?? [];
-    return allowed.contains(phone);
+      final List<dynamic>? numbers = doc.data()?['mobile'];
+      return numbers != null && numbers.contains(fullPhoneNumber);
+    } catch (e) {
+      debugPrint('Error checking phone: $e');
+      return false;
+    }
   }
 
   Future<void> _sendOtp() async {
@@ -35,25 +38,28 @@ class _LoginPageState extends State<LoginPage> {
 
     if (phone.isEmpty || phone.length != 10) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a valid 10-digit phone number')),
+        const SnackBar(
+          content: Text('Please enter a valid 10-digit phone number'),
+        ),
       );
       return;
     }
 
     setState(() => _isLoading = true);
 
-    // 🔐 Check Firestore restriction
-    final allowed = await _isPhoneAllowed(phone);
-    if (!allowed) {
+    final fullPhone = '+91$phone';
+    final isAllowed = await _isPhoneAllowed(fullPhone);
+
+    if (!isAllowed) {
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You are not authorized to login.')),
+        const SnackBar(content: Text('This number is not authorized to login')),
       );
       return;
     }
 
     await FirebaseAuth.instance.verifyPhoneNumber(
-      phoneNumber: '+91$phone',
+      phoneNumber: fullPhone,
       timeout: const Duration(seconds: 60),
       verificationCompleted: (PhoneAuthCredential credential) async {
         await FirebaseAuth.instance.signInWithCredential(credential);
@@ -119,42 +125,45 @@ class _LoginPageState extends State<LoginPage> {
         title: const Text('Login with OTP'),
         backgroundColor: Colors.teal,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          children: [
-            TextField(
-              controller: _phoneController,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: 'Phone Number',
-                prefixText: '+91 ',
-                border: OutlineInputBorder(),
-              ),
-              enabled: !_otpSent,
-            ),
-            const SizedBox(height: 20),
-            if (_otpSent)
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
               TextField(
-                controller: _otpController,
-                keyboardType: TextInputType.number,
+                controller: _phoneController,
+                keyboardType: TextInputType.phone,
                 decoration: const InputDecoration(
-                  labelText: 'Enter OTP',
+                  labelText: 'Phone Number',
+                  prefixText: '+91 ',
                   border: OutlineInputBorder(),
                 ),
+                enabled: !_otpSent,
               ),
-            const SizedBox(height: 20),
-            _isLoading
-                ? const CircularProgressIndicator()
-                : ElevatedButton(
-                    onPressed: _otpSent ? _verifyOtp : _sendOtp,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.teal,
-                      minimumSize: const Size.fromHeight(50),
-                    ),
-                    child: Text(_otpSent ? 'Verify OTP' : 'Send OTP'),
+              const SizedBox(height: 20),
+              if (_otpSent)
+                TextField(
+                  controller: _otpController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Enter OTP',
+                    border: OutlineInputBorder(),
                   ),
-          ],
+                ),
+              const SizedBox(height: 20),
+              _isLoading
+                  ? const CircularProgressIndicator()
+                  : ElevatedButton(
+                      onPressed: _otpSent ? _verifyOtp : _sendOtp,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.teal,
+                        minimumSize: const Size.fromHeight(50),
+                      ),
+                      child: Text(_otpSent ? 'Verify OTP' : 'Send OTP'),
+                    ),
+            ],
+          ),
         ),
       ),
     );
