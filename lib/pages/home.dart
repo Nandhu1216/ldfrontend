@@ -18,15 +18,15 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   String? selectedZone;
   String? selectedSupervisor;
-  String? selectedWard;
   String? selectedCategory;
+  String? selectedWard;
   DateTime? selectedDate;
   List<File> selectedImages = [];
 
   List<String> zones = [];
   List<String> supervisorsList = [];
-  List<String> wardList = [];
   List<String> categoryList = [];
+  List<String> wardList = [];
 
   bool _isUploading = false; // ✅ Upload flag
 
@@ -139,8 +139,8 @@ class _HomePageState extends State<HomePage> {
 
     if (selectedZone == null ||
         selectedSupervisor == null ||
-        selectedWard == null ||
         selectedCategory == null ||
+        selectedWard == null ||
         selectedDate == null ||
         selectedImages.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -161,8 +161,8 @@ class _HomePageState extends State<HomePage> {
         final request = http.MultipartRequest('POST', uri);
         request.fields['zone'] = selectedZone!;
         request.fields['supervisor'] = selectedSupervisor!;
-        request.fields['ward'] = selectedWard!;
         request.fields['category'] = selectedCategory!;
+        request.fields['ward'] = selectedWard!;
         request.fields['date'] = formattedDate;
         request.files.add(
           await http.MultipartFile.fromPath('image', image.path),
@@ -295,27 +295,6 @@ class _HomePageState extends State<HomePage> {
                   ),
                   const SizedBox(height: 16),
 
-                  /// Ward Dropdown
-                  DropdownButtonFormField<String>(
-                    decoration: const InputDecoration(
-                      labelText: "Select Ward",
-                      border: OutlineInputBorder(),
-                    ),
-                    value: selectedWard,
-                    items: wardList
-                        .map(
-                          (ward) =>
-                              DropdownMenuItem(value: ward, child: Text(ward)),
-                        )
-                        .toList(),
-                    onChanged: (ward) {
-                      setState(() {
-                        selectedWard = ward;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 16),
-
                   /// Category Dropdown
                   DropdownButtonFormField<String>(
                     decoration: const InputDecoration(
@@ -332,6 +311,27 @@ class _HomePageState extends State<HomePage> {
                     onChanged: (cat) {
                       setState(() {
                         selectedCategory = cat;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+
+                  /// Ward Dropdown
+                  DropdownButtonFormField<String>(
+                    decoration: const InputDecoration(
+                      labelText: "Select Ward",
+                      border: OutlineInputBorder(),
+                    ),
+                    value: selectedWard,
+                    items: wardList
+                        .map(
+                          (ward) =>
+                              DropdownMenuItem(value: ward, child: Text(ward)),
+                        )
+                        .toList(),
+                    onChanged: (ward) {
+                      setState(() {
+                        selectedWard = ward;
                       });
                     },
                   ),
